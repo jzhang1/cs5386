@@ -3,6 +3,7 @@ import spacy
 import itertools
 import tqdm
 import json
+import re
 from collections import Counter
 
 def load_data(data_dir, data_file):
@@ -24,6 +25,35 @@ def write_output(tokens, out_file, out_dir):
                 token += "\n"
             f.write(token)
 
+def send_to(src, *dests):
+    """
+    src is a generator
+    dests is a list of generators that accept send
+    """
+    for x in src:
+        for dest in dests:
+            dest.send(x)
+
+def write_counter(counter, out_dir, out_file, delimiter = '\t'):
+    """
+    write Counter to file with one entry per line
+    """
+    with open(os.path.join(out_dir, out_file), 'w', encoding = 'utf-8') as f:
+        for key in counter:
+            f.write("{0}{1}{2}\n", key, delimiter, counter[key])
+
+def write_list(lst, out_dir, out_file):
+    """
+    write List to file with one entry per line
+    """
+    with open(os.path.join(out_dir, out_file), 'w', encoding = 'utf-8') as f:
+        for line in lst:
+            f.write(line + "\n")
+
+def write_json(obj, out_dir, out_file):
+    with open(os.path.join(out_dir, out_file), 'w', encoding = 'utf-8') as f:
+        json.dump(obj, f)
+
 def run_all(data_dir = "../data", input_file = "microblog2011.txt", out_dir = "../output", **kwargs):
     """
     Run all the code
@@ -32,6 +62,7 @@ def run_all(data_dir = "../data", input_file = "microblog2011.txt", out_dir = ".
 
     # set of all keyword arguments where the value is True
     flags = set(k for k in kwargs if kwargs[k])
+
     show_progress = 'show_progress' in flags
     if show_progress:
         line_count = sum(1 for _ in load_data(data_dir, input_file))
@@ -64,83 +95,92 @@ def run_all(data_dir = "../data", input_file = "microblog2011.txt", out_dir = ".
 
         tokenize_dataset(data_stream, output_file)
 
-    """
-    SECTION: B
-    How many tokens did you find in the corpus? 
-    How many types (unique tokens) did you have? 
-    What is the type/token ratio for the corpus? 
-    The type/token ratio is defined as the number of types divided by the number of tokens.
-    """
-    
-    if 'b' in flags:
-        def token_stream():
-            data_stream = load_data(data_dir, input_file)
+    # tokens include \n EOL character
+    def token_stream():
+        data_stream = load_data(data_dir, input_file)
 
-            if show_progress:
-                data_stream = tqdm.tqdm(data_stream, total = line_count, unit = "lines")
-            return itertools.chain.from_iterable(map(tokenize, data_stream))
-            # tokens include \n EOL character
+        if show_progress:
+            data_stream = tqdm.tqdm(data_stream, total = line_count, unit = "lines")
+        return itertools.chain.from_iterable(map(tokenize, data_stream))
 
-        print("Calculating total token count.")
-        total_token_count = sum(1 for token in token_stream())
+    if 'token_counts' in flags:
+        print("Calculating token counts.")
+        token_counter = Counter(token_stream())
 
-        print("Calculating unique token count.")
-        unique_tokens = set(token_stream())
-        unique_token_count = sum(1 for token in unique_tokens)
-
-        print("Calculating type/token ratio.")
+        """
+        SECTION: B
+        How many tokens did you find in the corpus? 
+        How many types (unique tokens) did you have? 
+        What is the type/token ratio for the corpus? 
+        The type/token ratio is defined as the number of types divided by the number of tokens.
+        """
+        total_token_count = sum(token_counter.values())
+        unique_token_count = len(token_counter)
         type_token_ratio = total_token_count / unique_token_count
-
-        print("Counting tokens.")
-        token_count = Counter(token_stream())
-        most_common_100_tokens = token_count.most_common(100)
 
         output = {
             "total_token_count": total_token_count,
             "unique_token_count": unique_token_count,
-            "type_token_ratio": type_token_ratio,
-            "most_common_100_tokens": most_common_100_tokens
+            "type_token_ratio": type_token_ratio
         }
-        output_file = "b.json"
-        out_path = os.path.join(out_dir, output_file)
-        with open(out_path, 'w', encoding = 'utf-8') as f:
-            json.dump(output, f)
+        write_json(output, "b.json")
 
-    """
-    SECTION: C
-    For each token, print the token and its frequency in a file called Tokens.txt 
-    (from the most frequent to the least frequent) and include the first 100 lines in your report.
-    """
+        """
+        SECTION: C
+        For each token, print the token and its frequency in a file called Tokens.txt 
+        (from the most frequent to the least frequent) and include the first 100 lines in your report.
+        """
+        sorted_token_counter = token_counter.most_common()
+        write_counter(sorted_token_counter, out_dir, "Tokens.txt")
 
-    """
-    SECTION: D 
-    How many tokens appeared only once in the corpus?
-    """
+        """
+        SECTION: D 
+        How many tokens appeared only once in the corpus?
+        """
+        once_only_tokens = (token for token in token_counter if token_counter[token] == 1)
+        write_list(once_only_tokens, out_dir, "d.txt")        
 
-    """
-    SECTION: E
-    From the list of tokens, extract only words, by excluding punctuation and other symbols. 
-    How many words did you find? List the top 100 most frequent words in your report, with their frequencies. 
-    What is the type/token ratio when you use only word tokens (called lexical diversity)?
-    """
+        """
+        SECTION: E
+        From the list of tokens, extract only words, by excluding punctuation and other symbols. 
+        How many words did you find? List the top 100 most frequent words in your report, with their frequencies. 
+        What is the type/token ratio when you use only word tokens (called lexical diversity)?
+        """
+        word_regex = re.compile("^[a-z]+$", re.I)
+        word_counter = Counter({token: token_counter[token] for token in token_counter if word_regex.match(token)})
+        unique_words = len(word_counter)
+        word_count = sum(word_counter.values())
 
-    """
-    SECTION: F
-    From the list of words, exclude stopwords.
-    List the top 100 most frequent words and their frequencies.
-    You can use this list of stopwords (or any other that you consider adequate).
-    """
+        most_common_100_words = word_counter.most_common(100)
+        output = {
+            "unique_words": unique_words,
+            "lexical_diversity": unique_words / word_count,
+            "most_common_100_words": most_common_100_words,
+        }
+        write_json(output, "e.json")
 
-    """
-    SECTION: G
-    Compute all the pairs of two consecutive words (excluding stopwords and punctuation).
-    List the most frequent 100 pairs and their frequencies in your report. 
-    Also compute the type/token ratio when you use only word tokens without stopwords (called lexical density)?
-    """
+        """
+        SECTION: F
+        From the list of words, exclude stopwords.
+        List the top 100 most frequent words and their frequencies.
+        You can use this list of stopwords (or any other that you consider adequate).
+        """
+        stop_words = set(load_data(data_dir, "StopWords.txt"))
+        non_stop_words_counter = Counter({word: word_counter[word] for word in word_counter if word not in stop_words})
+        most_common_non_stopwords = non_stop_words_counter.most_common()
+        write_counter(most_common_non_stopwords, out_dir, "f.txt")
+
+    if 'pairs' in flags:
+        pass
+        """
+        SECTION: G
+        Compute all the pairs of two consecutive words (excluding stopwords and punctuation).
+        List the most frequent 100 pairs and their frequencies in your report. 
+        Also compute the type/token ratio when you use only word tokens without stopwords (called lexical density)?
+        """
 
     """
     SECTION: H
-    
     Extract multi-word expressions (composed of two or more words, so that the meaning of the expression is more than the composition of the meanings of its words). 
     You can use an existing tool or your own method (explain what tool or method you used). 
     List the most frequent 100 expressions extracted. 
@@ -162,5 +202,6 @@ if __name__ == "__main__":
         show_progress = True,
         # tokenize_dataset = True,
         # tokenize_dataset_first20 = True,
-        b = True,
+        token_counts = True,
+
     )
