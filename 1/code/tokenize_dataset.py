@@ -123,7 +123,7 @@ def run_all(data_dir = "../data", input_file = "microblog2011.txt", out_dir = ".
             "unique_token_count": unique_token_count,
             "type_token_ratio": type_token_ratio
         }
-        write_json(output, "b.json")
+        write_json(output, out_dir, "b.json")
 
         """
         SECTION: C
@@ -157,7 +157,7 @@ def run_all(data_dir = "../data", input_file = "microblog2011.txt", out_dir = ".
             "lexical_diversity": unique_words / word_count,
             "most_common_100_words": most_common_100_words,
         }
-        write_json(output, "e.json")
+        write_json(output, out_dir, "e.json")
 
         """
         SECTION: F
@@ -178,6 +178,7 @@ def run_all(data_dir = "../data", input_file = "microblog2011.txt", out_dir = ".
         List the most frequent 100 pairs and their frequencies in your report. 
         Also compute the type/token ratio when you use only word tokens without stopwords (called lexical density)?
         """
+
 
     """
     SECTION: H
