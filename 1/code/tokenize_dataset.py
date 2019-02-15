@@ -218,6 +218,7 @@ if __name__ == "__main__":
     - code
     - data
     - \ microblog2011.txt
+    - \ StopWords.txt
     - output
 
     Run the script from the <code> directory
@@ -227,6 +228,6 @@ if __name__ == "__main__":
         show_progress = True,
         # tokenize_dataset = True,
         # tokenize_dataset_first20 = True,
-        # token_counts = True,
+        token_counts = True,
         pairs = True
     )
